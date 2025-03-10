@@ -1,0 +1,21 @@
+# Development files
+node_modules/
+src/
+test/
+.nx/
+.eslintrc.js
+tsconfig.json
+jest.config.js
+babel.config.js
+
+# Git files
+.git/
+.gitignore
+
+# Build artifacts
+*.log
+coverage/
+
+# IDE files
+.vscode/
+.idea/ 

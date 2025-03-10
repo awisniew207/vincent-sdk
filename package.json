@@ -1,0 +1,56 @@
+{
+  "name": "vincent-sdk",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint . --ext .ts",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jwt",
+    "authentication",
+    "lit-protocol",
+    "pkp",
+    "ethereum",
+    "blockchain"
+  ],
+  "author": "Vincent SDK Team",
+  "license": "ISC",
+  "description": "A library for creating and verifying JWTs using PKP wallets, with Ethereum signature compatibility",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/vincent-sdk.git"
+  },
+  "homepage": "https://github.com/yourusername/vincent-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/yourusername/vincent-sdk/issues"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.9",
+    "@babel/preset-env": "^7.26.9",
+    "@babel/preset-typescript": "^7.26.0",
+    "@types/jest": "^29.5.14",
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0",
+    "babel-jest": "^29.7.0",
+    "eslint": "^9.21.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.6",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@lit-protocol/lit-auth-client": "^7.0.7",
+    "@lit-protocol/pkp-ethers": "^7.0.7",
+    "@lit-protocol/types": "^7.0.7",
+    "@noble/secp256k1": "^2.2.3",
+    "did-jwt": "^8.0.8",
+    "ethers": "^5.7.2",
+    "jose": "^6.0.8"
+  }
+}
