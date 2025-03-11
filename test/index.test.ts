@@ -16,6 +16,7 @@ describe('Vincent SDK', () => {
     let pkpWallet: PKPEthersWallet;
     let pkp: any;
     let jwt: string;
+    let jwtWithAudience: string;
 
     test('should create a PKP, generate a JWT, and verify it successfully', async () => {
       const ethersWallet = ethers.Wallet.createRandom();
@@ -91,6 +92,97 @@ describe('Vincent SDK', () => {
       expect(decoded.payload).toBeDefined();
       expect(decoded.payload.name).toBe('Lit Protocol User');
       expect(decoded.payload.pkpPublicKey).toBe(pkp.pkpPublicKey);
+    });
+
+    test('should create a JWT with audience claim when specified', async () => {
+      // Skip if the wallet wasn't initialized in the previous test
+      if (!pkpWallet || !pkp) {
+        console.log("Skipping audience test because previous test didn't complete");
+        return;
+      }
+
+      const audienceDomain = "example.com";
+      
+      jwtWithAudience = await createPKPSignedJWT(
+        pkpWallet, 
+        { publicKey: pkp.pkpPublicKey },
+        { 
+          name: 'Lit Protocol User',
+          timestamp: Date.now(),
+        },
+        10, // 10 minutes expiration
+        audienceDomain
+      );
+      
+      console.log("Created JWT with audience");
+      
+      const isValid = await verifyJWTSignature(jwtWithAudience);
+      expect(isValid).toBe(true);
+      
+      const decoded = didJWT.decodeJWT(jwtWithAudience);
+      expect(decoded.payload).toBeDefined();
+      expect(decoded.payload.aud).toBe(audienceDomain);
+    });
+    
+    test('should support multiple audience domains in a JWT', async () => {
+      // Skip if the wallet wasn't initialized in the previous test
+      if (!pkpWallet || !pkp) {
+        console.log("Skipping multiple audience test because previous test didn't complete");
+        return;
+      }
+
+      const audienceDomains = ["api.example.com", "admin.example.com"];
+      
+      const jwtWithMultipleAudiences = await createPKPSignedJWT(
+        pkpWallet, 
+        { publicKey: pkp.pkpPublicKey },
+        { 
+          name: 'Lit Protocol Admin',
+          timestamp: Date.now(),
+        },
+        10, // 10 minutes expiration
+        audienceDomains
+      );
+      
+      console.log("Created JWT with multiple audiences");
+      
+      const isValid = await verifyJWTSignature(jwtWithMultipleAudiences);
+      expect(isValid).toBe(true);
+      
+      const decoded = didJWT.decodeJWT(jwtWithMultipleAudiences);
+      expect(decoded.payload).toBeDefined();
+      expect(Array.isArray(decoded.payload.aud)).toBe(true);
+      expect(decoded.payload.aud).toEqual(audienceDomains);
+    });
+
+    test('should verify a JWT against the expected audience', async () => {
+      // Skip if the wallet wasn't initialized in the previous test
+      if (!pkpWallet || !pkp) {
+        console.log("Skipping audience validation test because previous test didn't complete");
+        return;
+      }
+
+      const audienceDomain = "api.myservice.com";
+      
+      const jwtWithSpecificAudience = await createPKPSignedJWT(
+        pkpWallet, 
+        { publicKey: pkp.pkpPublicKey },
+        { name: 'Lit Protocol User' },
+        10, // 10 minutes expiration
+        audienceDomain
+      );
+      
+      // Should be valid when expected audience matches
+      const isValidForCorrectAudience = await verifyJWTSignature(jwtWithSpecificAudience, audienceDomain);
+      expect(isValidForCorrectAudience).toBe(true);
+      
+      // Should be invalid when expected audience doesn't match
+      const isValidForWrongAudience = await verifyJWTSignature(jwtWithSpecificAudience, "wrong.domain.com");
+      expect(isValidForWrongAudience).toBe(false);
+      
+      // Should be valid with no audience check
+      const isValidWithNoAudienceCheck = await verifyJWTSignature(jwtWithSpecificAudience);
+      expect(isValidWithNoAudienceCheck).toBe(true);
     });
   });
 

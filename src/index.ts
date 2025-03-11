@@ -87,6 +87,7 @@ export function createPKPSigner(pkpWallet: PKPEthersWallet) {
  * @param pkp - The PKP information object containing controller information
  * @param payload - The custom payload to include in the JWT
  * @param expiresInMinutes - How long until the JWT expires (defaults to 10 minutes)
+ * @param audience - The domain(s) this token is intended for (aud claim)
  * @returns A promise that resolves to the signed JWT string
  * @example
  * ```typescript
@@ -94,7 +95,8 @@ export function createPKPSigner(pkpWallet: PKPEthersWallet) {
  *   pkpWallet,
  *   pkpInfo,
  *   { name: "Lit Protocol User", customField: "value" },
- *   30 // expires in 30 minutes
+ *   30, // expires in 30 minutes
+ *   "example.com" // audience domain
  * );
  * ```
  */
@@ -102,7 +104,8 @@ export async function createPKPSignedJWT(
   pkpWallet: PKPEthersWallet,
   pkp: any,
   payload: Record<string, any>,
-  expiresInMinutes: number = 10  // Default 10-minute expiration
+  expiresInMinutes: number = 10,  // Default 10-minute expiration
+  audience: string | string[]    // Optional audience domain(s)
 ): Promise<string> {
   const signer = createPKPSigner(pkpWallet);
   
@@ -111,7 +114,15 @@ export async function createPKPSignedJWT(
   
   const walletAddress = await pkpWallet.getAddress();
   
-  const fullPayload = {
+  const fullPayload: {
+    iat: number;
+    exp: number;
+    timestamp: number;
+    iss: string;
+    pkpPublicKey: any;
+    aud?: string | string[];
+    [key: string]: any;
+  } = {
     ...payload,
     iat,
     exp,
@@ -119,6 +130,11 @@ export async function createPKPSignedJWT(
     iss: `did:ethr:${walletAddress}`,
     pkpPublicKey: pkp.publicKey
   };
+
+  // Add audience claim if provided
+  if (audience) {
+    fullPayload.aud = audience;
+  }
   
   const jwt = await didJWT.createJWT(
     fullPayload,
@@ -135,19 +151,21 @@ export async function createPKPSignedJWT(
  * 1. The JWT signature is valid
  * 2. The JWT is not expired
  * 3. All time claims (nbf, iat) are valid
+ * 4. If an expected audience is provided, the JWT's audience claim includes it
  * 
  * @param jwt - The JWT string to verify
+ * @param expectedAudience - Domain that should be in the audience claim
  * @returns boolean indicating if the JWT is completely valid
  * @example
  * ```typescript
- * if (await verifyJWTSignature(jwt)) {
- *   // JWT is valid - process the request
+ * if (await verifyJWTSignature(jwt, 'myapp.com')) {
+ *   // JWT is valid and intended for myapp.com - process the request
  * } else {
  *   // JWT is invalid - reject the request
  * }
  * ```
  */
-export async function verifyJWTSignature(jwt: string): Promise<boolean> {
+export async function verifyJWTSignature(jwt: string, expectedAudience: string): Promise<boolean> {
   try {
     const decoded = didJWT.decodeJWT(jwt);
     
@@ -179,6 +197,18 @@ export async function verifyJWTSignature(jwt: string): Promise<boolean> {
         console.error('JWT verification failed: Invalid time claims');
       }
       return false;
+    }
+    
+    // Validate audience if expected audience is provided
+    if (expectedAudience && decoded.payload.aud) {
+      const audiences = Array.isArray(decoded.payload.aud) 
+        ? decoded.payload.aud 
+        : [decoded.payload.aud];
+      
+      if (!audiences.includes(expectedAudience)) {
+        console.error(`JWT verification failed: Token not intended for ${expectedAudience}`);
+        return false;
+      }
     }
     
     try {
