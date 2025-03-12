@@ -77,14 +77,16 @@ describe('Vincent SDK', () => {
         { 
           name: 'Lit Protocol User',
           timestamp: Date.now(),
-        }
+        },
+        10, // 10 minutes expiration
+        "lit-protocol.com" // Default audience
       );
       console.log("Created JWT");
       console.log(jwt);
 
       // Test the verification function
       console.log("Verifying JWT");
-      const isValid = await verifyJWTSignature(jwt);
+      const isValid = await verifyJWTSignature(jwt, "lit-protocol.com");
       console.log("JWT valid:", isValid);
       expect(isValid).toBe(true);
       
@@ -92,6 +94,7 @@ describe('Vincent SDK', () => {
       expect(decoded.payload).toBeDefined();
       expect(decoded.payload.name).toBe('Lit Protocol User');
       expect(decoded.payload.pkpPublicKey).toBe(pkp.pkpPublicKey);
+      expect(decoded.payload.aud).toBe("lit-protocol.com");
     });
 
     test('should create a JWT with audience claim when specified', async () => {
@@ -116,12 +119,12 @@ describe('Vincent SDK', () => {
       
       console.log("Created JWT with audience");
       
-      const isValid = await verifyJWTSignature(jwtWithAudience);
-      expect(isValid).toBe(true);
+      const isValidAudience = await verifyJWTSignature(jwtWithAudience, audienceDomain);
+      expect(isValidAudience).toBe(true);
       
-      const decoded = didJWT.decodeJWT(jwtWithAudience);
-      expect(decoded.payload).toBeDefined();
-      expect(decoded.payload.aud).toBe(audienceDomain);
+      const decodedAudience = didJWT.decodeJWT(jwtWithAudience);
+      expect(decodedAudience.payload).toBeDefined();
+      expect(decodedAudience.payload.aud).toBe(audienceDomain);
     });
     
     test('should support multiple audience domains in a JWT', async () => {
@@ -146,13 +149,14 @@ describe('Vincent SDK', () => {
       
       console.log("Created JWT with multiple audiences");
       
-      const isValid = await verifyJWTSignature(jwtWithMultipleAudiences);
-      expect(isValid).toBe(true);
+      // Should validate against any of the audience domains
+      const isValidMultipleAudiences = await verifyJWTSignature(jwtWithMultipleAudiences, audienceDomains[0]);
+      expect(isValidMultipleAudiences).toBe(true);
       
-      const decoded = didJWT.decodeJWT(jwtWithMultipleAudiences);
-      expect(decoded.payload).toBeDefined();
-      expect(Array.isArray(decoded.payload.aud)).toBe(true);
-      expect(decoded.payload.aud).toEqual(audienceDomains);
+      const decodedMultiAudiences = didJWT.decodeJWT(jwtWithMultipleAudiences);
+      expect(decodedMultiAudiences.payload).toBeDefined();
+      expect(Array.isArray(decodedMultiAudiences.payload.aud)).toBe(true);
+      expect(decodedMultiAudiences.payload.aud).toEqual(audienceDomains);
     });
 
     test('should verify a JWT against the expected audience', async () => {
@@ -180,9 +184,14 @@ describe('Vincent SDK', () => {
       const isValidForWrongAudience = await verifyJWTSignature(jwtWithSpecificAudience, "wrong.domain.com");
       expect(isValidForWrongAudience).toBe(false);
       
-      // Should be valid with no audience check
-      const isValidWithNoAudienceCheck = await verifyJWTSignature(jwtWithSpecificAudience);
-      expect(isValidWithNoAudienceCheck).toBe(true);
+      // Test for audience validation failure
+      try {
+        // This should fail validation since the expected audience doesn't match
+        await verifyJWTSignature(jwtWithSpecificAudience, "another.domain.com");
+        fail("Should have thrown an error for audience mismatch");
+      } catch (error) {
+        expect(error).toBeDefined();
+      }
     });
   });
 
@@ -194,6 +203,7 @@ describe('Vincent SDK', () => {
     
     const mockPublicKey = '0x04ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
     const mockIssuer = 'did:ethr:0x123456789abcdef';
+    const testAudience = "test.domain.com";
 
     // This test verifies that a valid JWT with proper time claims passes validation
     test('should validate a JWT with correct time claims', async () => {
@@ -204,12 +214,13 @@ describe('Vincent SDK', () => {
           exp: now + 600, // 10 minutes in the future
           iat: now - 60,  // 1 minute in the past
           nbf: now - 60,  // 1 minute in the past
-          pkpPublicKey: mockPublicKey
+          pkpPublicKey: mockPublicKey,
+          aud: testAudience
         },
         { issuer: mockIssuer, signer, alg: 'ES256K' }
       );
       
-      const isValid = await verifyJWTSignature(validJWT);
+      const isValid = await verifyJWTSignature(validJWT, testAudience);
       
       // We're not expecting this to be valid since we're using a mock signer
       console.log("Valid JWT test result:", isValid);
@@ -223,13 +234,14 @@ describe('Vincent SDK', () => {
         {
           exp: now + 600,     // 10 minutes in the future
           iat: now + 300,     // 5 minutes in the future
-          pkpPublicKey: mockPublicKey
+          pkpPublicKey: mockPublicKey,
+          aud: testAudience
         },
         { issuer: mockIssuer, signer, alg: 'ES256K' }
       );
       
       // Test verification - should be false because time is invalid
-      const isValid = await verifyJWTSignature(futureIatJWT);
+      const isValid = await verifyJWTSignature(futureIatJWT, testAudience);
       expect(isValid).toBe(false);
     });
 
@@ -241,13 +253,14 @@ describe('Vincent SDK', () => {
           exp: now + 600,     // 10 minutes in the future
           iat: now - 60,      // 1 minute in the past
           nbf: now + 300,     // 5 minutes in the future
-          pkpPublicKey: mockPublicKey
+          pkpPublicKey: mockPublicKey,
+          aud: testAudience
         },
         { issuer: mockIssuer, signer, alg: 'ES256K' }
       );
       
       // Test verification - should be false because time is invalid
-      const isValid = await verifyJWTSignature(futureNbfJWT);
+      const isValid = await verifyJWTSignature(futureNbfJWT, testAudience);
       expect(isValid).toBe(false);
     });
 
@@ -258,13 +271,32 @@ describe('Vincent SDK', () => {
         {
           exp: now - 600,     // 10 minutes in the past (expired)
           iat: now - 1200,    // 20 minutes in the past
-          pkpPublicKey: mockPublicKey
+          pkpPublicKey: mockPublicKey,
+          aud: testAudience
         },
         { issuer: mockIssuer, signer, alg: 'ES256K' }
       );
       
       // Test verification - should be false because token is expired
-      const isValid = await verifyJWTSignature(expiredJWT);
+      const isValid = await verifyJWTSignature(expiredJWT, testAudience);
+      expect(isValid).toBe(false);
+    });
+    
+    test('should reject a JWT with no audience', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      
+      const noAudienceJWT = await didJWT.createJWT(
+        {
+          exp: now + 600,     // 10 minutes in the future
+          iat: now - 60,      // 1 minute in the past
+          pkpPublicKey: mockPublicKey
+          // No aud claim
+        },
+        { issuer: mockIssuer, signer, alg: 'ES256K' }
+      );
+      
+      // Test verification - should be false because audience is missing
+      const isValid = await verifyJWTSignature(noAudienceJWT, testAudience);
       expect(isValid).toBe(false);
     });
   });

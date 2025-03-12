@@ -105,7 +105,7 @@ export async function createPKPSignedJWT(
   pkp: any,
   payload: Record<string, any>,
   expiresInMinutes: number = 10,  // Default 10-minute expiration
-  audience: string | string[]    // Optional audience domain(s)
+  audience: string | string[]    // Required audience domain(s)
 ): Promise<string> {
   const signer = createPKPSigner(pkpWallet);
   
@@ -131,10 +131,8 @@ export async function createPKPSignedJWT(
     pkpPublicKey: pkp.publicKey
   };
 
-  // Add audience claim if provided
-  if (audience) {
-    fullPayload.aud = audience;
-  }
+  // Always set the audience claim
+  fullPayload.aud = audience;
   
   const jwt = await didJWT.createJWT(
     fullPayload,
@@ -151,7 +149,7 @@ export async function createPKPSignedJWT(
  * 1. The JWT signature is valid
  * 2. The JWT is not expired
  * 3. All time claims (nbf, iat) are valid
- * 4. If an expected audience is provided, the JWT's audience claim includes it
+ * 4. The JWT has an audience claim that includes the expected audience
  * 
  * @param jwt - The JWT string to verify
  * @param expectedAudience - Domain that should be in the audience claim
@@ -199,16 +197,24 @@ export async function verifyJWTSignature(jwt: string, expectedAudience: string):
       return false;
     }
     
-    // Validate audience if expected audience is provided
-    if (expectedAudience && decoded.payload.aud) {
-      const audiences = Array.isArray(decoded.payload.aud) 
-        ? decoded.payload.aud 
-        : [decoded.payload.aud];
-      
-      if (!audiences.includes(expectedAudience)) {
-        console.error(`JWT verification failed: Token not intended for ${expectedAudience}`);
-        return false;
-      }
+    // Always validate audience - reject if no audience claim or expected audience isn't included
+    if (!decoded.payload.aud) {
+      console.error('JWT verification failed: No audience claim (aud) set');
+      return false;
+    }
+
+    if (!expectedAudience) {
+      console.error('JWT verification failed: Expected audience cannot be empty');
+      return false;
+    }
+    
+    const audiences = Array.isArray(decoded.payload.aud) 
+      ? decoded.payload.aud 
+      : [decoded.payload.aud];
+    
+    if (!audiences.includes(expectedAudience)) {
+      console.error(`JWT verification failed: Expected audience ${expectedAudience} not found in aud claim`);
+      return false;
     }
     
     try {
@@ -260,4 +266,3 @@ export async function verifyJWTSignature(jwt: string, expectedAudience: string):
     return false;
   }
 }
-
