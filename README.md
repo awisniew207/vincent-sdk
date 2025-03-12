@@ -29,10 +29,20 @@ const jwt = await createPKPSignedJWT(
   pkpWallet,
   pkpInfo,
   { name: "User Name", customClaim: "value" },
-  30 // expires in 30 minutes
+  30, // expires in 30 minutes
+  "example.com" // audience claim - the domain this token is intended for
 );
 
 console.log(jwt);
+
+// You can also specify multiple audience domains
+const jwtWithMultipleAudiences = await createPKPSignedJWT(
+  pkpWallet,
+  pkpInfo,
+  { name: "User Name", customClaim: "value" },
+  30, // expires in 30 minutes
+  ["api.example.com", "admin.example.com"] // multiple audience domains
+);
 ```
 
 ### Verifying a JWT
@@ -49,6 +59,13 @@ if (await verifyJWTSignature(jwt)) {
 } else {
   console.log("JWT is invalid!");
 }
+
+// You can also verify the JWT with audience validation
+if (await verifyJWTSignature(jwt, "example.com")) {
+  console.log("JWT is valid and intended for example.com!");
+} else {
+  console.log("JWT is invalid or not intended for example.com!");
+}
 ```
 
 #### Detailed Verification
@@ -64,9 +81,14 @@ console.log("Token expired?", isExpired);
 console.log("Time claims valid?", isValidTime);
 console.log("Payload:", decodedPayload);
 
+// Check audience if needed
+const isIntendedForMyDomain = Array.isArray(decodedPayload.aud) 
+  ? decodedPayload.aud.includes('myapp.com')
+  : decodedPayload.aud === 'myapp.com';
+
 // If all validations pass, token is valid
-if (isVerified && !isExpired && isValidTime) {
-  console.log("JWT verified successfully!");
+if (isVerified && !isExpired && isValidTime && isIntendedForMyDomain) {
+  console.log("JWT verified successfully and intended for my domain!");
 } else {
   console.log("JWT verification failed");
 }
@@ -76,8 +98,10 @@ if (isVerified && !isExpired && isValidTime) {
 
 - Create JWT tokens signed by PKP wallets
 - Verify JWT signatures against PKP public keys
+- Support for audience (aud) claim with single or multiple domains
 - Automatically includes standard JWT claims (exp, iat)
 - Validates token expiration, issuance time (iat), and not-before time (nbf)
+- Optional audience validation during verification
 - Compatible with Ethereum's signing method
 - Simple boolean verification and detailed verification options
 
@@ -87,7 +111,7 @@ if (isVerified && !isExpired && isValidTime) {
 
 Creates a signer function that can be used with did-jwt to sign JWTs using a PKP wallet.
 
-### `createPKPSignedJWT(pkpWallet, pkp, payload, expiresInMinutes = 10)`
+### `createPKPSignedJWT(pkpWallet, pkp, payload, expiresInMinutes = 10, audience?: string | string[])`
 
 Creates a JWT signed by the provided PKP wallet with the specified payload.
 
@@ -96,22 +120,32 @@ Parameters:
 - `pkp`: Object containing PKP information (must include publicKey)
 - `payload`: Custom claims to include in the JWT
 - `expiresInMinutes`: Duration until the token expires (default: 10 minutes)
+- `audience`: Optional domain or array of domains this token is intended for (aud claim)
 
-### `verifyJWTSignature(jwt: string): Promise<boolean>`
+### `verifyJWTSignature(jwt: string, expectedAudience?: string): Promise<boolean>`
 
 Simple verification function that returns a boolean indicating if the JWT is valid.
 
-Returns:
-- `boolean`: True if signature is valid, token is not expired, and time claims are valid
+Parameters:
+- `jwt`: The JWT string to verify
+- `expectedAudience`: Optional domain that should be in the audience claim
 
-### `verifyJWTSignatureDetailed(jwt: string)`
+Returns:
+- `boolean`: True if signature is valid, token is not expired, time claims are valid, and (if specified) the expected audience is included in the token's audience claim
+
+### `verifyJWTSignatureDetailed(jwt: string, expectedAudience?: string)`
 
 Detailed verification function that returns comprehensive validation results.
+
+Parameters:
+- `jwt`: The JWT string to verify
+- `expectedAudience`: Optional domain that should be in the audience claim
 
 Returns:
 - `isVerified`: Boolean indicating if the signature is valid
 - `isExpired`: Boolean indicating if the JWT has expired
 - `isValidTime`: Boolean indicating if the JWT is valid in time (checks iat and nbf claims)
+- `isValidAudience`: Boolean indicating if the expected audience is included in the token's audience claim (only if expectedAudience is provided)
 - `decodedPayload`: The decoded payload from the JWT
 
 ### Utility functions
