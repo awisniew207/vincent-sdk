@@ -66,29 +66,6 @@ if (await verifyJWTSignature(jwtWithMultipleAudiences, "api.example.com")) {
 }
 ```
 
-#### Detailed Verification
-
-```typescript
-import { verifyJWTSignatureDetailed } from 'vincent-sdk';
-
-// Get detailed verification results with required audience parameter
-const { isVerified, isExpired, isValidTime, isValidAudience, decodedPayload } = 
-  await verifyJWTSignatureDetailed(jwt, "example.com");
-
-console.log("Signature valid?", isVerified);
-console.log("Token expired?", isExpired);
-console.log("Time claims valid?", isValidTime);
-console.log("Audience valid?", isValidAudience);
-console.log("Payload:", decodedPayload);
-
-// If all validations pass, token is valid
-if (isVerified && !isExpired && isValidTime && isValidAudience) {
-  console.log("JWT verified successfully!");
-} else {
-  console.log("JWT verification failed");
-}
-```
-
 ## Features
 
 - Create JWT tokens signed by PKP wallets
@@ -98,7 +75,6 @@ if (isVerified && !isExpired && isValidTime && isValidAudience) {
 - Validates token expiration, issuance time (iat), and not-before time (nbf)
 - Strict audience validation during verification
 - Compatible with Ethereum's signing method
-- Simple boolean verification and detailed verification options
 
 ## API Reference
 
@@ -127,21 +103,6 @@ Parameters:
 
 Returns:
 - `boolean`: True if signature is valid, token is not expired, time claims are valid, and the expected audience is included in the token's audience claim
-
-### `verifyJWTSignatureDetailed(jwt: string, expectedAudience: string)`
-
-Detailed verification function that returns comprehensive validation results.
-
-Parameters:
-- `jwt`: The JWT string to verify
-- `expectedAudience`: Domain that should be in the audience claim. The token must include this domain in its aud claim.
-
-Returns:
-- `isVerified`: Boolean indicating if the signature is valid
-- `isExpired`: Boolean indicating if the JWT has expired
-- `isValidTime`: Boolean indicating if the JWT is valid in time (checks iat and nbf claims)
-- `isValidAudience`: Boolean indicating if the expected audience is included in the token's audience claim
-- `decodedPayload`: The decoded payload from the JWT
 
 ### Utility functions
 
